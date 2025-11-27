@@ -1,0 +1,72 @@
+# Node dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+debug.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Build output / dist
+/dist/
+/build/
+.tmp/
+tmp/
+.temp/
+
+# Environment files (keep a .env.example separately)
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dotenv vault (usually committed) - uncomment if you want to ignore
+# .env.vault
+
+# Redis persistence (if present locally)
+dump.rdb
+*.rdb
+appendonly.aof
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Cache / misc
+.eslintcache
+.node_repl_history
+*.tgz
+*.orig
+
+# Git credentials / security
+.git-credentials
+
+# Optional: lock files from other managers (uncomment if standardizing on one)
+# yarn.lock
+# pnpm-lock.yaml
+# package-lock.json
+
+# Temporary uploads
+*.swp
+
+# Mongo dumps (if any)
+*.dump
