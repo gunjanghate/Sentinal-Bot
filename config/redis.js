@@ -1,12 +1,24 @@
 import { Redis } from "ioredis";
 
-// BullMQ requires maxRetriesPerRequest to be null for blocking ops
-export const redis = new Redis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
+const redis = new Redis(process.env.REDIS_URL);
+
+redis.on("connect", () => {
+  console.log("🔗 Redis Connected Successfully");
 });
 
-redis.on("connect", () => console.log("🔗 Redis connected"));
-redis.on("error", (err) => console.log("❌ Redis error", err));
+redis.on("error", (err) => {
+  console.error("❌ Redis Connection Error:", err);
+});
 
 export default redis;
+
+
+
+// ➤ What this file does:
+// Creates a Redis connection using ioredis
+// Makes Redis available to queues + workers
+// Logs when Redis connects or errors
+// Ensures the queue system works across entire backend
+
+// Redis will be used for:
+// PR Processing Queue

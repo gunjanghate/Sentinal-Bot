@@ -11,6 +11,7 @@ pnpm-debug.log*
 lerna-debug.log*
 debug.log
 
+.package-lock.json
 # Runtime data
 pids/
 *.pid
@@ -34,6 +35,9 @@ tmp/
 .env.development.local
 .env.test.local
 .env.production.local
+ 
+
+.pem
 
 # Dotenv vault (usually committed) - uncomment if you want to ignore
 # .env.vault
