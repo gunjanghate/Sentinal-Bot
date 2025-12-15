@@ -37,7 +37,7 @@ tmp/
 .env.production.local
  
 
-.pem
+private-key.pem
 
 # Dotenv vault (usually committed) - uncomment if you want to ignore
 # .env.vault

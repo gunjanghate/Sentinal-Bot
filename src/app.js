@@ -28,5 +28,7 @@ import webhookRoutes from "../routes/webhook.routes.js";
 app.use("/api/webhook/github", webhookRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/prs", prRoutes);
-
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 export default app;

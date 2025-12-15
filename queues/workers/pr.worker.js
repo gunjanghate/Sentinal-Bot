@@ -1,114 +1,144 @@
 import { Worker } from "bullmq";
-import redis from "../../config/redis.js";
+import bullRedis from "../../config/bullRedis.js";
 import {
-    fetchPullRequest,
-    fetchPullRequestFiles,
+  fetchPullRequest,
+  fetchPullRequestFiles,
 } from "../../services/githubApi.service.js";
+import { runScorer } from "../../services/scorer.services.js";
 import PR from "../../models/PR.js";
 import Contributor from "../../models/Contributor.js";
 
+const EVENT_LABEL = "ECWoC26";
+
 const prWorker = new Worker(
-    "pr-queue",
-    async (job) => {
-        const {
-            installation_id,
-            repo_owner,
-            repo_name,
-            pr_number,
-        } = job.data;
+  "pr-queue",
+  async (job) => {
+    const {
+      installation_id,
+      repo_owner,
+      repo_name,
+      pr_number,
+    } = job.data;
 
-        console.log("👷 Processing PR:", pr_number);
+    console.log("👷 Processing PR:", pr_number);
 
-        const pr = await fetchPullRequest({
-            installationId: installation_id,
-            owner: repo_owner,
-            repo: repo_name,
-            prNumber: pr_number,
-        });
-        if (!pr.merged) {
-            console.log(`PR #${pr.number} is not merged yet. Skipping.`);
-            return {
-                skipped: true,
-                reason: "PR not merged",
-            };
-        }
-        const existingPR = await PR.findOne({
-            repoOwner: repo_owner,
-            repoName: repo_name,
-            prNumber: pr_number,
-        });
+    // 1️⃣ Fetch PR details
+    const pr = await fetchPullRequest({
+      installationId: installation_id,
+      owner: repo_owner,
+      repo: repo_name,
+      prNumber: pr_number,
+    });
 
-        if (existingPR?.scored) {
-            console.log(`⏭️ PR #${pr_number} already scored. Skipping.`);
-            return { skipped: true, reason: "Already scored" };
-        }
+    // 2️⃣ HARD GATE: Check event label
+    const hasEventLabel = pr.labels?.some(
+      (label) => label.name === EVENT_LABEL
+    );
 
+    if (!hasEventLabel) {
+      console.log(
+        `⏭️ PR #${pr.number} skipped — missing label "${EVENT_LABEL}"`
+      );
+      return {
+        skipped: true,
+        reason: "Missing event label",
+      };
+    }
 
-        const files = await fetchPullRequestFiles({
-            installationId: installation_id,
-            owner: repo_owner,
-            repo: repo_name,
-            prNumber: pr_number,
-        });
+    // 3️⃣ Only merged PRs are scored
+    if (!pr.merged) {
+      console.log(`⏭️ PR #${pr.number} not merged yet. Skipping.`);
+      return {
+        skipped: true,
+        reason: "PR not merged",
+      };
+    }
 
-        console.log("📄 PR title:", pr.title);
-        console.log("📂 Files changed:", files.length);
+    // 4️⃣ Idempotency check (already scored?)
+    const existingPR = await PR.findOne({
+      repoOwner: repo_owner,
+      repoName: repo_name,
+      prNumber: pr_number,
+    });
 
-        const result = runScorer(pr, files);
+    if (existingPR?.scored) {
+      console.log(`⏭️ PR #${pr_number} already scored. Skipping.`);
+      return {
+        skipped: true,
+        reason: "Already scored",
+      };
+    }
 
-        // 1️⃣ Save PR record
-        const prRecord = await PR.findOneAndUpdate(
-            {
-                repoOwner: repo_owner,
-                repoName: repo_name,
-                prNumber: pr_number,
-            },
-            {
-                repoOwner: repo_owner,
-                repoName: repo_name,
-                prNumber: pr_number,
+    // 5️⃣ Fetch PR files
+    const files = await fetchPullRequestFiles({
+      installationId: installation_id,
+      owner: repo_owner,
+      repo: repo_name,
+      prNumber: pr_number,
+    });
 
-                contributor: pr.user.login,
-                prTitle: pr.title,
-                prUrl: pr.html_url,
+    console.log("📄 PR title:", pr.title);
+    console.log("📂 Files changed:", files.length);
 
-                score: result.score,
-                level: result.level,
-                points: result.points,
-                reasons: result.reasons,
-                scored: true,
-            },
-            { upsert: true, new: true }
-        );
+    // 6️⃣ Run scorer
+    const result = runScorer(pr, files);
 
+    // 7️⃣ Save PR record
+    await PR.findOneAndUpdate(
+      {
+        repoOwner: repo_owner,
+        repoName: repo_name,
+        prNumber: pr_number,
+      },
+      {
+        repoOwner: repo_owner,
+        repoName: repo_name,
+        prNumber: pr_number,
 
-        // 2️⃣ Update contributor points
-        await Contributor.findOneAndUpdate(
-            { githubUsername: pr.user.login },
-            {
-                $inc: {
-                    totalPoints: result.points,
-                    totalPRs: 1,
-                },
-            },
-            { upsert: true }
-        );
+        contributor: pr.user.login,
+        prTitle: pr.title,
+        prUrl: pr.html_url,
 
-        console.log(`🏅 Points assigned to ${pr.user.login}: +${result.points}`);
+        score: result.score,
+        level: result.level,
+        points: result.points,
+        reasons: result.reasons,
+        scored: true,
+      },
+      { upsert: true, new: true }
+    );
 
+    // 8️⃣ Update contributor stats
+    await Contributor.findOneAndUpdate(
+      { githubUsername: pr.user.login },
+      {
+        $inc: {
+          totalPoints: result.points,
+          totalPRs: 1,
+        },
+      },
+      { upsert: true }
+    );
 
-        console.log("🎯 PR Scored:", {
-            pr: pr.number,
-            level: result.level,
-            points: result.points,
-        });
+    console.log(
+      `🏅 Points assigned to ${pr.user.login}: +${result.points}`
+    );
 
-        return {
-            prNumber: pr.number,
-            ...result,
-        };
-    },
-    { connection: redis }
+    console.log("🎯 PR Scored:", {
+      pr: pr.number,
+      level: result.level,
+      points: result.points,
+    });
+
+    return {
+      prNumber: pr.number,
+      ...result,
+    };
+  },
+  {
+    connection: bullRedis,
+    concurrency: 5,
+  }
 );
 
 export default prWorker;
