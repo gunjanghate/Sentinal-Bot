@@ -5,6 +5,7 @@ import path from "path";
 
 const privateKeyPath = process.env.GITHUB_PRIVATE_KEY_PATH; // .pem file path
 const privateKey = fs.readFileSync(privateKeyPath, "utf8");
+const pvtKey = process.env.GITHUB_PRIVATE_KEY;
 
 const APP_ID = process.env.GITHUB_APP_ID;
 
@@ -20,7 +21,7 @@ export const createAppJWT = () => {
     iss: APP_ID,         // GitHub App ID
   };
 
-  return jwt.sign(payload, privateKey, { algorithm: "RS256" });
+  return jwt.sign(payload, privateKey || pvtKey, { algorithm: "RS256" });
 };
 
 /**
