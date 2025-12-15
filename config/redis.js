@@ -7,11 +7,7 @@ const isProd = process.env.NODE_ENV === "production";
 const redis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
-  ...(isProd && {
-    tls: {
-      minVersion: "TLSv1.2",
-    },
-  }),
+
 });
 redis.on("connect", () => {
   console.log("🔗 Redis Connected Successfully");

@@ -8,11 +8,7 @@ const isProd = process.env.NODE_ENV === "production";
 const bullRedis = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
   enableReadyCheck: true,
-  ...(isProd && {
-    tls: {
-      minVersion: "TLSv1.2",
-    },
-  }),
+
 });
 
 bullRedis.on("connect", () => {
