@@ -44,6 +44,58 @@ export const getInstallationAccessToken = async (installationId) => {
   return response.data.token;
 };
 
+/**
+ * Add an ECWoC26 level label to a PR (issues API),
+ * optionally removing any existing ECWoC26-L* labels first.
+ */
+export const addLabelToPullRequest = async ({
+  installationId,
+  owner,
+  repo,
+  prNumber,
+  label,
+}) => {
+  const token = await getInstallationAccessToken(installationId);
+
+  const baseUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}`;
+
+  const axiosConfig = {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+    },
+    timeout: 10_000,
+  };
+
+  // 1️⃣ Fetch existing labels to remove old ECWoC26-L* labels
+  const existingLabelsResponse = await axios.get(`${baseUrl}/labels`, axiosConfig);
+  const existingLabels = Array.isArray(existingLabelsResponse.data)
+    ? existingLabelsResponse.data
+    : [];
+
+  const labelsToRemove = existingLabels
+    .map((l) => l?.name)
+    .filter((name) => typeof name === "string" && name.startsWith("ECWoC26-L"));
+
+  if (labelsToRemove.length > 0) {
+    await Promise.all(
+      labelsToRemove.map((name) =>
+        axios.delete(
+          `${baseUrl}/labels/${encodeURIComponent(name)}`,
+          axiosConfig
+        )
+      )
+    );
+  }
+
+  // 2️⃣ Add the new label
+  await axios.post(
+    `${baseUrl}/labels`,
+    { labels: [label] },
+    axiosConfig
+  );
+};
+
 
 
 // import axios from "axios";

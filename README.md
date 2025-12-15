@@ -58,6 +58,31 @@ Create a system that:
 
 ### High-Level Flow
 
+
+
+```
+PR merged
+  ↓
+Webhook received
+  ↓
+Job queued
+  ↓
+Worker starts
+  ↓
+Fetch PR + files
+  ↓
+Run scorer
+  ↓
+Apply ECWoC26-Lx label 
+  ↓
+Save score in DB
+  ↓
+Update contributor
+  ↓
+Job completed
+
+```
+
 ```
 
 Contributor → Pull Request → Merge
