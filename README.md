@@ -39,12 +39,14 @@ Create a system that:
 ## 🧠 Key Design Decisions (Brainstorming Summary)
 
 ### ❌ What we rejected
+
 - Manual review committees (not scalable)
 - Polling GitHub APIs every few hours (inefficient)
 - Asking project admins to do extra work
 - Relying on file structure assumptions (`src/`, `db/`, etc.)
 
 ### ✅ What we chose
+
 - **GitHub App** (event-driven, scalable)
 - **Webhook-based ingestion**
 - **Async processing with queues**
@@ -57,8 +59,6 @@ Create a system that:
 ## 🏗️ System Architecture
 
 ### High-Level Flow
-
-
 
 ```
 PR merged
@@ -73,7 +73,7 @@ Fetch PR + files
   ↓
 Run scorer
   ↓
-Apply ECWoC26-Lx label 
+Apply ECWoC26-Lx label
   ↓
 Save score in DB
   ↓
@@ -102,7 +102,7 @@ PR Scorer Worker
 v
 MongoDB (Scores & Leaderboard)
 
-````
+```
 
 ---
 
@@ -129,6 +129,7 @@ MongoDB (Scores & Leaderboard)
 ### Rule-Based (No AI, No ML)
 
 Scoring is **deterministic and auditable**, based on:
+
 - Lines changed
 - Files touched
 - Nature of changes (tests, logic, config)
@@ -144,9 +145,59 @@ Scoring is **deterministic and auditable**, based on:
 
 ---
 
+## 📏 Scoring Metrics & Levels
+
+Once a PR passes the hard gates (has the event label and is merged), it is scored purely based on objective signals from the PR payload and its changed files.
+
+### 1. Metrics Used
+
+- **Lines of code changed (additions + deletions)**
+
+  - `> 200` LOC → **+30** points, reason: "Large code change (>200 LOC)"
+  - `51–200` LOC → **+20** points, reason: "Medium code change (50–200 LOC)"
+  - `0–50` LOC → **+10** points, reason: "Small code change (<50 LOC)"
+
+- **Number of files changed**
+
+  - `> 6` files → **+20** points, reason: "Many files modified (>10)" (label text is legacy, logic is `> 6`)
+  - `4–6` files → **+10** points, reason: "Multiple files modified"
+  - `0–3` files → **+0** extra points from this metric
+
+- **Presence of tests**
+
+  - If **any changed file name** matches `/test|spec/i` → **+10** points, reason: "Includes test files"
+
+- **Docs‑only PR penalty**
+  - If **every changed file** ends with `.md` → **−15** points, reason: "Docs-only PR"
+
+The final **raw score** for a PR is the sum of all the above contributions, and every individual reason is stored for transparency.
+
+### 2. Mapping Score → Level & Event Points
+
+After computing the raw score, it is mapped to a **difficulty level** and **event points** as follows:
+
+- **Level L3**
+
+  - Condition: `score ≥ 50`
+  - Event points: **10**
+
+- **Level L2**
+
+  - Condition: `30 ≤ score < 50`
+  - Event points: **7**
+
+- **Level L1**
+  - Condition: `score < 30`
+  - Event points: **3**
+
+There is currently **no separate "Level 0"** once a PR reaches the scoring stage; if it passes the event label + merged gates, it will receive at least **L1** with the corresponding points, even if heavily penalized (e.g., docs‑only PRs).
+
+---
+
 ## 🧰 Tech Stack
 
 ### Backend
+
 - **Node.js**
 - **Express.js**
 - **BullMQ** (job queue)
@@ -154,6 +205,7 @@ Scoring is **deterministic and auditable**, based on:
 - **MongoDB Atlas** (persistent data)
 
 ### Infrastructure
+
 - **GitHub App + Webhooks**
 - **Render (Free tier)**
 - **UptimeRobot** (keep-alive mitigation)
@@ -163,12 +215,14 @@ Scoring is **deterministic and auditable**, based on:
 ## ☁️ Deployment Strategy (Reality-Aware)
 
 ### Why Render?
+
 - Free
 - Simple
 - HTTPS by default
 - Webhook-friendly
 
 ### Known Limitation
+
 Render free services **sleep after inactivity**.
 
 ### Mitigations Applied ✅
@@ -191,6 +245,8 @@ Render free services **sleep after inactivity**.
 6. **Health Keep-Alive Endpoint**
    ```http
    GET /health → 200 OK
+   ```
+
 ````
 
 Pinged every 5 minutes via UptimeRobot to prevent sleep.
@@ -291,3 +347,4 @@ For questions, discussions, or improvements:
 
 Just tell me.
 ```
+````
