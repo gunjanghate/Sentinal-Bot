@@ -147,30 +147,48 @@ Scoring is **deterministic and auditable**, based on:
 
 ## 📏 Scoring Metrics & Levels
 
-Once a PR passes the hard gates (has the event label and is merged), it is scored purely based on objective signals from the PR payload and its changed files.
+Once a PR passes the event gates (has the event label and is merged), it is scored purely based on objective signals from the PR payload and its changed files.
 
 ### 1. Metrics Used
 
-- **Lines of code changed (additions + deletions)**
+- **Hard gate: docs‑only PRs**
 
-  - `> 200` LOC → **+30** points, reason: "Large code change (>200 LOC)"
-  - `51–200` LOC → **+20** points, reason: "Medium code change (50–200 LOC)"
-  - `0–50` LOC → **+10** points, reason: "Small code change (<50 LOC)"
+  - If **every changed file** ends with `.md`, the PR is treated as **docs‑only**.
+  - Docs‑only PRs are always mapped to:
+    - **Score:** `10`
+    - **Level:** `L1`
+    - **Event points:** `3`
+    - Reason: "Docs-only PR (capped at L1)".
+  - The remaining metrics below apply only to PRs that are **not** docs‑only.
 
-- **Number of files changed**
+- **Effort: lines of code changed (additions + deletions)**
 
-  - `> 6` files → **+20** points, reason: "Many files modified (>10)" (label text is legacy, logic is `> 6`)
-  - `4–6` files → **+10** points, reason: "Multiple files modified"
-  - `0–3` files → **+0** extra points from this metric
+  - `> 150` LOC → **+30** points, reason: "High effort change (>150 LOC)"
+  - `40–150` LOC → **+20** points, reason: "Moderate effort change (40–150 LOC)"
+  - `< 40` LOC → **+10** points, reason: "Low effort change (<40 LOC)"
 
-- **Presence of tests**
+- **Breadth: number of files changed**
 
-  - If **any changed file name** matches `/test|spec/i` → **+10** points, reason: "Includes test files"
+  - `≥ 5` files → **+20** points, reason: "Broad change across multiple files (5+)"
+  - `2–4` files → **+10** points, reason: "Multi-file change"
+  - `1` file → **+0** extra points from this metric
 
-- **Docs‑only PR penalty**
-  - If **every changed file** ends with `.md` → **−15** points, reason: "Docs-only PR"
+- **Anti‑spam: change density**
 
-The final **raw score** for a PR is the sum of all the above contributions, and every individual reason is stored for transparency.
+  - Density is computed as: `density = (additions + deletions) / max(files_changed, 1)`.
+  - `density < 5` → **−15** points, reason: "Low change density (many files, tiny changes)"
+  - `density > 20` → **+10** points, reason: "High change density (substantial work per file)"
+
+- **Feature signal: new files added**
+
+  - Count of files with status `added`.
+  - `≥ 2` new files → **+10** points, reason: "Introduces new files (feature-level change)".
+
+- **Quality signal: meaningful tests**
+
+  - If **any changed file name** matches `/test|spec/i` **and** that file has `≥ 10` additions → **+10** points, reason: "Includes meaningful test coverage".
+
+The final **raw score** for a non-docs PR is the sum of all the above contributions, and every individual reason is stored for transparency.
 
 ### 2. Mapping Score → Level & Event Points
 

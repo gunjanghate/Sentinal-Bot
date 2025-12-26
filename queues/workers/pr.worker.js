@@ -89,13 +89,13 @@ const prWorker = new Worker(
             const levelLabel = `${EVENT_LABEL}-${result.level}`;
 
             try {
-                await addLabelToPullRequest({
+             await addLabelToPullRequest({
                     installationId: installation_id,
                     owner: repo_owner,
                     repo: repo_name,
                     prNumber: pr_number,
                     label: levelLabel,
-                });
+                });   
 
                 console.log(
                     `🏷️ Applied label ${levelLabel} to PR ${repo_owner}/${repo_name}#${pr_number}`
