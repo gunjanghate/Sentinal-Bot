@@ -85,17 +85,32 @@ const prWorker = new Worker(
             // 6️⃣ Run scorer
             const result = runScorer(pr, files);
 
+            // 6️⃣.1️⃣ Compute metrics for persistence
+            const locChanged = pr.additions + pr.deletions;
+            const filesCount = files.length;
+            const density = locChanged / Math.max(filesCount, 1);
+
+            const newFilesCount = files.filter(
+                (file) => file.status === "added"
+            ).length;
+
+            const hasTests = files.some(
+                (file) =>
+                    /test|spec/i.test(file.filename) &&
+                    file.additions >= 10
+            );
+
             // 6.1️⃣ Apply ECWoC26 level label (best-effort)
             const levelLabel = `${EVENT_LABEL}-${result.level}`;
 
             try {
-             await addLabelToPullRequest({
+                await addLabelToPullRequest({
                     installationId: installation_id,
                     owner: repo_owner,
                     repo: repo_name,
                     prNumber: pr_number,
                     label: levelLabel,
-                });   
+                });
 
                 console.log(
                     `🏷️ Applied label ${levelLabel} to PR ${repo_owner}/${repo_name}#${pr_number}`
@@ -124,10 +139,19 @@ const prWorker = new Worker(
                     prTitle: pr.title,
                     prUrl: pr.html_url,
 
+                    mergedAt: pr.merged_at ? new Date(pr.merged_at) : undefined,
+
                     score: result.score,
                     level: result.level,
                     points: result.points,
                     reasons: result.reasons,
+                    metrics: {
+                        locChanged,
+                        filesChanged: filesCount,
+                        density,
+                        newFilesCount,
+                        hasTests,
+                    },
                     scored: true,
                 },
                 { upsert: true, new: true }
@@ -140,6 +164,11 @@ const prWorker = new Worker(
                     $inc: {
                         totalPoints: result.points,
                         totalPRs: 1,
+                    },
+                    $set: {
+                        lastContributionAt: pr.merged_at
+                            ? new Date(pr.merged_at)
+                            : new Date(),
                     },
                 },
                 { upsert: true }

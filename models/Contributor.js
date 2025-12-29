@@ -6,6 +6,7 @@ const contributorSchema = new mongoose.Schema(
 
     totalPoints: { type: Number, default: 0 },
     totalPRs: { type: Number, default: 0 },
+    lastContributionAt: Date,
   },
   { timestamps: true }
 );

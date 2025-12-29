@@ -10,11 +10,20 @@ const prSchema = new mongoose.Schema(
 
     prTitle: String,
     prUrl: String,
+    mergedAt: Date,
 
     score: Number,
     level: String,
     points: Number,
     reasons: [String],
+    metrics: {
+      locChanged: Number,
+      filesChanged: Number,
+      density: Number,
+      newFilesCount: Number,
+      hasTests: Boolean,
+    },
+
 
     scored: { type: Boolean, default: false },
   },
