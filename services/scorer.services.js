@@ -45,12 +45,12 @@ export const runScorer = (pr, files) => {
   // 2️⃣ EFFORT: Lines of Code
   // -----------------------------
   // LOC is a rough but stack-agnostic proxy for effort.
-  if (locChanged > 150) {
+  if (locChanged > 200) {
     score += 30;
-    reasons.push("High effort change (>150 LOC)");
+    reasons.push("High effort change (>200 LOC)");
   } else if (locChanged >= 50) {
     score += 20;
-    reasons.push("Moderate effort change (50–150 LOC)");
+    reasons.push("Moderate effort change (50–200 LOC)");
   } else {
     score += 10;
     reasons.push("Low effort change (<50 LOC)");
