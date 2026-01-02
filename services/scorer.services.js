@@ -10,9 +10,10 @@ export const runScorer = (pr, files) => {
   let score = 0;
   const reasons = [];
 
-  const locChanged = pr.additions + pr.deletions;
+  // Only count added lines as "effort" to avoid rewarding large deletions
+  const locAdded = pr.additions;
   const filesCount = files.length;
-  const density = locChanged / Math.max(filesCount, 1);
+  const density = locAdded / Math.max(filesCount, 1);
 
   // -----------------------------
   // FILE TYPE ANALYSIS
@@ -58,15 +59,15 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   // 1️⃣ EFFORT: LOC
   // -----------------------------
-  if (locChanged > 250) {
+  if (locAdded > 250) {
     score += 30;
-    reasons.push("High effort change (>250 LOC)");
-  } else if (locChanged >= 50) {
+    reasons.push("High effort change (>250 added LOC)");
+  } else if (locAdded >= 50) {
     score += 20;
-    reasons.push("Moderate effort change (50–250 LOC)");
+    reasons.push("Moderate effort change (50–250 added LOC)");
   } else {
     score += 10;
-    reasons.push("Low effort change (<50 LOC)");
+    reasons.push("Low effort change (<50 added LOC)");
   }
 
   // -----------------------------
