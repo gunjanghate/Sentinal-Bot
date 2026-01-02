@@ -39,6 +39,10 @@ export const runScorer = (pr, files) => {
     isMarkupFile(file.filename)
   );
 
+  const hasAnyMarkup = files.some((file) =>
+    isMarkupFile(file.filename)
+  );
+
   // -----------------------------
   // HARD GATE: Docs-only
   // -----------------------------
@@ -54,12 +58,12 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   // 1️⃣ EFFORT: LOC
   // -----------------------------
-  if (locChanged > 200) {
+  if (locChanged > 250) {
     score += 30;
-    reasons.push("High effort change (>200 LOC)");
+    reasons.push("High effort change (>250 LOC)");
   } else if (locChanged >= 50) {
     score += 20;
-    reasons.push("Moderate effort change (50–200 LOC)");
+    reasons.push("Moderate effort change (50–250 LOC)");
   } else {
     score += 10;
     reasons.push("Low effort change (<50 LOC)");
@@ -113,8 +117,20 @@ export const runScorer = (pr, files) => {
     reasons.push("Includes meaningful test coverage");
   }
 
+
   // -----------------------------
-  // 6️⃣ FINAL LEVEL MAPPING
+  // 6️⃣ MARKUP DILUTION ADJUSTMENT
+  // -----------------------------
+  if (hasAnyMarkup && !isMarkupOnly) {
+    score -= 20;
+    reasons.push(
+      "Contains HTML/CSS alongside code; adjusted to reduce styling-dominated score"
+    );
+  }
+
+
+  // -----------------------------
+  // 7️⃣ FINAL LEVEL MAPPING
   // -----------------------------
   let level, points;
 
@@ -129,8 +145,9 @@ export const runScorer = (pr, files) => {
     points = 3;
   }
 
+
   // -----------------------------
-  // 7️⃣ COMPLEXITY CAP: HTML/CSS-only
+  // 8️⃣ COMPLEXITY CAP: HTML/CSS-only
   // -----------------------------
   if (isMarkupOnly && level === "L3") {
     level = "L2";
