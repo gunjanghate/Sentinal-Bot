@@ -3,35 +3,45 @@
  *
  * Philosophy:
  * Score PRs based on EFFORT × BREADTH × QUALITY − NOISE
- *
- * This avoids fragile assumptions like "frontend vs backend"
- * and instead focuses on universally observable signals.
+ * Then apply complexity-based caps to prevent gaming.
  */
 
 export const runScorer = (pr, files) => {
   let score = 0;
   const reasons = [];
 
-  // -----------------------------
-  // BASIC METRICS
-  // -----------------------------
-
   const locChanged = pr.additions + pr.deletions;
   const filesCount = files.length;
-
-  // Change density helps detect spam:
-  // touching many files with tiny changes is low-effort noise
   const density = locChanged / Math.max(filesCount, 1);
 
   // -----------------------------
-  // 1️⃣ HARD GATE: Docs-only PR
+  // FILE TYPE ANALYSIS
   // -----------------------------
-  // Docs-only PRs are valuable, but should not compete
-  // with code contributions in OSS events.
+
+  const MARKUP_EXTENSIONS = [
+    ".html",
+    ".htm",
+    ".css",
+    ".scss",
+    ".sass",
+  ];
+
+  const isMarkupFile = (filename) =>
+    MARKUP_EXTENSIONS.some((ext) =>
+      filename.toLowerCase().endsWith(ext)
+    );
+
   const isDocsOnly = files.every((file) =>
     file.filename.endsWith(".md")
   );
 
+  const isMarkupOnly = files.every((file) =>
+    isMarkupFile(file.filename)
+  );
+
+  // -----------------------------
+  // HARD GATE: Docs-only
+  // -----------------------------
   if (isDocsOnly) {
     return {
       score: 10,
@@ -42,9 +52,8 @@ export const runScorer = (pr, files) => {
   }
 
   // -----------------------------
-  // 2️⃣ EFFORT: Lines of Code
+  // 1️⃣ EFFORT: LOC
   // -----------------------------
-  // LOC is a rough but stack-agnostic proxy for effort.
   if (locChanged > 200) {
     score += 30;
     reasons.push("High effort change (>200 LOC)");
@@ -57,9 +66,8 @@ export const runScorer = (pr, files) => {
   }
 
   // -----------------------------
-  // 3️⃣ BREADTH: Files changed
+  // 2️⃣ BREADTH: Files changed
   // -----------------------------
-  // More files usually indicate broader impact or integration work.
   if (filesCount >= 5) {
     score += 20;
     reasons.push("Broad change across multiple files (5+)");
@@ -69,9 +77,8 @@ export const runScorer = (pr, files) => {
   }
 
   // -----------------------------
-  // 4️⃣ ANTI-SPAM: Change density
+  // 3️⃣ ANTI-SPAM: Density
   // -----------------------------
-  // Prevents gaming by touching many files with trivial edits.
   if (density < 5) {
     score -= 15;
     reasons.push("Low change density (many files, tiny changes)");
@@ -81,9 +88,8 @@ export const runScorer = (pr, files) => {
   }
 
   // -----------------------------
-  // 5️⃣ FEATURE SIGNAL: New files
+  // 4️⃣ FEATURE SIGNAL: New files
   // -----------------------------
-  // Adding new files often indicates new functionality.
   const newFilesCount = files.filter(
     (file) => file.status === "added"
   ).length;
@@ -94,10 +100,8 @@ export const runScorer = (pr, files) => {
   }
 
   // -----------------------------
-  // 6️⃣ QUALITY SIGNAL: Tests
+  // 5️⃣ QUALITY SIGNAL: Tests
   // -----------------------------
-  // Tests only count if they have meaningful additions
-  // (prevents fake test files with no content).
   const meaningfulTests = files.some(
     (file) =>
       /test|spec/i.test(file.filename) &&
@@ -110,9 +114,8 @@ export const runScorer = (pr, files) => {
   }
 
   // -----------------------------
-  // 7️⃣ FINAL LEVEL MAPPING
+  // 6️⃣ FINAL LEVEL MAPPING
   // -----------------------------
-  // Levels require multiple strong signals to avoid abuse.
   let level, points;
 
   if (score >= 50) {
@@ -124,6 +127,17 @@ export const runScorer = (pr, files) => {
   } else {
     level = "L1";
     points = 3;
+  }
+
+  // -----------------------------
+  // 7️⃣ COMPLEXITY CAP: HTML/CSS-only
+  // -----------------------------
+  if (isMarkupOnly && level === "L3") {
+    level = "L2";
+    points = 7;
+    reasons.push(
+      "HTML/CSS-only changes capped at L2 due to low system complexity"
+    );
   }
 
   return {
