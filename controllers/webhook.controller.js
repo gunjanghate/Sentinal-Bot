@@ -1,6 +1,8 @@
 import { verifyGitHubSignature } from "../utils/verifyGitHubSignature.js";
 import { prQueue } from "../queues/prQueue.js";
 
+const EVENT_LABEL = "ECWoC26";
+
 export const handleGitHubWebhook = async (req, res) => {
   // 1. Verify signature
   const isValid = verifyGitHubSignature(req);
@@ -17,23 +19,44 @@ export const handleGitHubWebhook = async (req, res) => {
   console.log(`📬 Webhook received: ${event} | action: ${payload.action}`);
 
   // 3. Only handle pull_request events for now
-  if (event === "pull_request" && payload.action === "closed" &&
-    payload.pull_request.merged === true) {
+  if (event === "pull_request") {
     const installationId = payload?.installation?.id;
     const repoOwner = payload?.repository?.owner?.login;
     const repoName = payload?.repository?.name;
     const prNumber = payload?.number;
 
-    // Send PR event to Redis queue
-    await prQueue.add("processPR", {
-      installation_id: installationId,
-      repo_owner: repoOwner,
-      repo_name: repoName,
-      pr_number: prNumber,
-      action: payload.action,
-    });
+    // Case 1: PR closed via merge (existing behaviour preserved)
+    if (payload.action === "closed" && payload.pull_request?.merged === true) {
+      await prQueue.add("processPR", {
+        installation_id: installationId,
+        repo_owner: repoOwner,
+        repo_name: repoName,
+        pr_number: prNumber,
+        action: payload.action,
+      });
 
-    console.log("📨 PR job added to queue");
+      console.log(
+        `📨 Enqueued PR scoring job (event=closed, repo=${repoOwner}/${repoName}, pr=#${prNumber})`
+      );
+    }
+
+    // Case 2: ECWoC label added (new behaviour)
+    if (
+      payload.action === "labeled" &&
+      payload.label?.name === EVENT_LABEL
+    ) {
+      await prQueue.add("processPR", {
+        installation_id: installationId,
+        repo_owner: repoOwner,
+        repo_name: repoName,
+        pr_number: prNumber,
+        action: payload.action,
+      });
+
+      console.log(
+        `📨 Enqueued PR scoring job (event=labeled:${EVENT_LABEL}, repo=${repoOwner}/${repoName}, pr=#${prNumber})`
+      );
+    }
   }
 
   // Respond instantly to GitHub
