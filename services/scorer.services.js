@@ -61,13 +61,13 @@ export const runScorer = (pr, files) => {
   // 1️⃣ EFFORT: LOC
   // -----------------------------
   if (locAdded > 250) {
-    score += 30;
+    score += 25;
     reasons.push("High effort change (>250 added LOC)");
   } else if (locAdded >= 50) {
-    score += 20;
+    score += 10;
     reasons.push("Moderate effort change (50–250 added LOC)");
   } else {
-    score += 10;
+    score += 5;
     reasons.push("Low effort change (<50 added LOC)");
   }
 
@@ -75,10 +75,10 @@ export const runScorer = (pr, files) => {
   // 2️⃣ BREADTH: Files changed
   // -----------------------------
   if (filesCount >= 5) {
-    score += 20;
+    score += 15;
     reasons.push("Broad change across multiple files (5+)");
   } else if (filesCount >= 2) {
-    score += 10;
+    score += 8;
     reasons.push("Multi-file change");
   }
 
@@ -89,7 +89,7 @@ export const runScorer = (pr, files) => {
     score -= 15;
     reasons.push("Low change density (many files, tiny changes)");
   } else if (density > 20) {
-    score += 10;
+    score += 8;
     reasons.push("High change density (substantial work per file)");
   }
 
@@ -101,7 +101,7 @@ export const runScorer = (pr, files) => {
   ).length;
 
   if (newFilesCount >= 2) {
-    score += 10;
+    score += 8;
     reasons.push("Introduces new files (feature-level change)");
   }
 
@@ -136,7 +136,7 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   let level, points;
 
-  if (score >= 50) {
+  if (score >= 55) {
     level = "L3";
     points = 10;
   } else if (score >= 30) {
