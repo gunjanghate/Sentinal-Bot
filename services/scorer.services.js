@@ -25,6 +25,7 @@ export const runScorer = (pr, files) => {
     ".css",
     ".scss",
     ".sass",
+    ".yml"
   ];
 
   const isMarkupFile = (filename) =>
