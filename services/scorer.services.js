@@ -16,6 +16,18 @@ export const runScorer = (pr, files) => {
   const density = locAdded / Math.max(filesCount, 1);
 
   // -----------------------------
+  // HARD GATE: No additions => INVALID
+  // -----------------------------
+  if (locAdded === 0) {
+    return {
+      score: 0,
+      level: "INVALID",
+      points: 0,
+      reasons: ["No added lines; PR marked INVALID"],
+    };
+  }
+
+  // -----------------------------
   // FILE TYPE ANALYSIS
   // -----------------------------
 
