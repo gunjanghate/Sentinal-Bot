@@ -136,9 +136,15 @@ export const runScorer = (pr, files) => {
   // 6️⃣ MARKUP DILUTION ADJUSTMENT
   // -----------------------------
   if (hasAnyMarkup && !isMarkupOnly) {
-    score -= 20;
+    score -= 8;
     reasons.push(
       "Contains HTML/CSS alongside code; adjusted to reduce styling-dominated score"
+    );
+  }
+    if (isMarkupOnly) {
+    score -= 20;
+    reasons.push(
+      "HTML/CSS-only changes; adjusted to reduce styling-dominated score"
     );
   }
 
