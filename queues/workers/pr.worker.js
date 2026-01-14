@@ -8,8 +8,43 @@ import { runScorer } from "../../services/scorer.services.js";
 import { addLabelToPullRequest } from "../../services/github.services.js";
 import PR from "../../models/PR.js";
 import Contributor from "../../models/Contributor.js";
+import { BLOCKED_USERS, BLOCKED_PROJECTS } from "../../config/hardgates.js";
 
 const EVENT_LABEL = "ECWoC26";
+
+const isHardBlockedPR = ({ pr, repoOwner, repoName }) => {
+  const username = pr?.user?.login?.toLowerCase() || "";
+  const repoSlug = `${repoOwner}/${repoName}`.toLowerCase();
+  const repoUrl =
+    pr?.base?.repo?.html_url?.toLowerCase() ||
+    pr?.head?.repo?.html_url?.toLowerCase() ||
+    "";
+
+  const blockedUsers = new Set((BLOCKED_USERS || []).map((u) => u.toLowerCase()));
+  const blockedProjects = (BLOCKED_PROJECTS || []).map((p) => p.toLowerCase());
+
+  if (blockedUsers.has(username)) {
+    return {
+      blocked: true,
+      reason: `Contributor ${pr.user.login} is blocked for this event`,
+    };
+  }
+
+  const matchesProject = blockedProjects.some((entry) => {
+    if (!entry) return false;
+    const normalized = entry.replace(/^https?:\/\/github\.com\//, "").toLowerCase();
+    return repoSlug === normalized || repoUrl.endsWith(`/${normalized}`) || repoUrl === `https://github.com/${normalized}`;
+  });
+
+  if (matchesProject) {
+    return {
+      blocked: true,
+      reason: `Repository ${repoSlug} is marked as removed for this event`,
+    };
+  }
+
+  return { blocked: false };
+};
 
 const prWorker = new Worker(
   "pr-queue",
@@ -86,7 +121,83 @@ const prWorker = new Worker(
         };
       }
 
-      // 4️⃣ Fetch PR files
+      // 4️⃣ HARD GATE: Removed / disqualified projects & users
+      const { blocked, reason: hardgateReason } = isHardBlockedPR({
+        pr,
+        repoOwner: repo_owner,
+        repoName: repo_name,
+      });
+
+      if (blocked) {
+        const locChanged = pr.additions + pr.deletions;
+
+        const result = {
+          score: 0,
+          level: "REMOVED",
+          points: 0,
+          reasons: [
+            "Project marked as removed according to event rules",
+            ...(hardgateReason ? [hardgateReason] : []),
+          ],
+        };
+
+        const removedLabel = `${EVENT_LABEL}-REMOVED`;
+        try {
+          await addLabelToPullRequest({
+            installationId: installation_id,
+            owner: repo_owner,
+            repo: repo_name,
+            prNumber: pr_number,
+            label: removedLabel,
+          });
+          console.log(`🏷️ Applied label ${removedLabel} for removed project/user`);
+        } catch (err) {
+          console.error("⚠️ Labeling (REMOVED) failed:", err.message);
+        }
+
+        await PR.findOneAndUpdate(
+          {
+            repoOwner: repo_owner,
+            repoName: repo_name,
+            prNumber: pr_number,
+          },
+          {
+            repoOwner: repo_owner,
+            repoName: repo_name,
+            prNumber: pr_number,
+            contributor: pr.user.login,
+            prTitle: pr.title,
+            prUrl: pr.html_url,
+            mergedAt: pr.merged_at ? new Date(pr.merged_at) : undefined,
+            score: result.score,
+            level: result.level,
+            points: result.points,
+            reasons: result.reasons,
+            metrics: {
+              locChanged,
+              filesChanged: 0,
+              density: 0,
+              newFilesCount: 0,
+              hasTests: false,
+            },
+            scored: true,
+            pendingReason: null,
+          },
+          { upsert: true, new: true }
+        );
+
+        console.log(
+          `🚫 PR #${pr_number} marked as REMOVED (${hardgateReason || "blocked project/user"})`
+        );
+
+        return {
+          prNumber: pr.number,
+          ...result,
+          removed: true,
+        };
+      }
+
+      // 5️⃣ Fetch PR files
       const files = await fetchPullRequestFiles({
         installationId: installation_id,
         owner: repo_owner,
@@ -94,10 +205,10 @@ const prWorker = new Worker(
         prNumber: pr_number,
       });
 
-      // 5️⃣ Run scorer
+      // 6️⃣ Run scorer
       const result = runScorer(pr, files);
 
-      // 6️⃣ Compute metrics
+      // 7️⃣ Compute metrics
       const locChanged = pr.additions + pr.deletions;
       const filesCount = files.length;
       const density = locChanged / Math.max(filesCount, 1);
@@ -110,7 +221,7 @@ const prWorker = new Worker(
           file.additions >= 10
       );
 
-      // 7️⃣ Apply level label (best-effort)
+      // 8️⃣ Apply level label (best-effort)
       const levelLabel = `${EVENT_LABEL}-${result.level}`;
       try {
         await addLabelToPullRequest({
@@ -125,7 +236,7 @@ const prWorker = new Worker(
         console.error("⚠️ Labeling failed:", err.message);
       }
 
-      // 8️⃣ Persist final PR record
+      // 9️⃣ Persist final PR record
       await PR.findOneAndUpdate(
         {
           repoOwner: repo_owner,
@@ -157,7 +268,7 @@ const prWorker = new Worker(
         { upsert: true, new: true }
       );
 
-      // 9️⃣ Update contributor stats
+      // 🔟 Update contributor stats
       await Contributor.findOneAndUpdate(
         { githubUsername: pr.user.login },
         {
