@@ -20,6 +20,8 @@ export const BLOCKED_PROJECTS = [
     "https://github.com/sr-857/AstraGuard-AI",
     "https://github.com/ayanmanna123/GPS_Tracker",
     "https://github.com/NexGenStudioDev/LocalMind",
-    "https://github.com/Gooichand/blockchain-evidence"
+    "https://github.com/Gooichand/blockchain-evidence",
+    "https://github.com/SUGAM-ARORA/Divinora",
+    "https://github.com/SUGAM-ARORA/Toolva"
 
 ];
