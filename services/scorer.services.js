@@ -37,7 +37,9 @@ export const runScorer = (pr, files) => {
     ".css",
     ".scss",
     ".sass",
-    ".yml"
+    ".yml",
+    ".json",
+    ".txt"
   ];
 
   const isMarkupFile = (filename) =>
@@ -72,12 +74,12 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   // 1️⃣ EFFORT: LOC
   // -----------------------------
-  if (locAdded > 200) {
-    score += 25;
-    reasons.push("High effort change (>200 added LOC)");
+  if (locAdded > 300) {
+    score += 20;
+    reasons.push("High effort change (>300 added LOC)");
   } else if (locAdded >= 50) {
     score += 10;
-    reasons.push("Moderate effort change (50–200 added LOC)");
+    reasons.push("Moderate effort change (50–300 added LOC)");
   } else {
     score += 5;
     reasons.push("Low effort change (<50 added LOC)");
@@ -97,7 +99,7 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   // 3️⃣ ANTI-SPAM: Density
   // -----------------------------
-  if (density < 5) {
+  if (density < 4) {
     score -= 15;
     reasons.push("Low change density (many files, tiny changes)");
   } else if (density > 20) {
@@ -136,7 +138,7 @@ export const runScorer = (pr, files) => {
   // 6️⃣ MARKUP DILUTION ADJUSTMENT
   // -----------------------------
   if (hasAnyMarkup && !isMarkupOnly) {
-    score -= 8;
+    score -= 10;
     reasons.push(
       "Contains HTML/CSS alongside code; adjusted to reduce styling-dominated score"
     );
