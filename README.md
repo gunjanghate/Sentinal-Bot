@@ -145,14 +145,13 @@ Scoring is **deterministic and auditable**, based on:
 
 ---
 
-## 📏 Scoring Metrics & Levels
+## 📏 Scoring Metrics, Levels & Time Windows
 
 Once a PR passes the event gates (has the event label and is merged), it is scored purely based on objective signals from the PR payload and its changed files.
 
 ### 1. Metrics Used
 
 - **Hard gate: docs‑only PRs**
-
   - If **every changed file** ends with `.md`, the PR is treated as **docs‑only**.
   - Docs‑only PRs are always mapped to:
     - **Score:** `10`
@@ -162,30 +161,25 @@ Once a PR passes the event gates (has the event label and is merged), it is scor
   - The remaining metrics below apply only to PRs that are **not** docs‑only.
 
 - **Effort: lines of code changed (additions + deletions)**
-
   - `> 150` LOC → **+30** points, reason: "High effort change (>150 LOC)"
   - `40–150` LOC → **+20** points, reason: "Moderate effort change (40–150 LOC)"
   - `< 40` LOC → **+10** points, reason: "Low effort change (<40 LOC)"
 
 - **Breadth: number of files changed**
-
   - `≥ 5` files → **+20** points, reason: "Broad change across multiple files (5+)"
   - `2–4` files → **+10** points, reason: "Multi-file change"
   - `1` file → **+0** extra points from this metric
 
 - **Anti‑spam: change density**
-
   - Density is computed as: `density = (additions + deletions) / max(files_changed, 1)`.
   - `density < 5` → **−15** points, reason: "Low change density (many files, tiny changes)"
   - `density > 20` → **+10** points, reason: "High change density (substantial work per file)"
 
 - **Feature signal: new files added**
-
   - Count of files with status `added`.
   - `≥ 2` new files → **+10** points, reason: "Introduces new files (feature-level change)".
 
 - **Quality signal: meaningful tests**
-
   - If **any changed file name** matches `/test|spec/i` **and** that file has `≥ 10` additions → **+10** points, reason: "Includes meaningful test coverage".
 
 The final **raw score** for a non-docs PR is the sum of all the above contributions, and every individual reason is stored for transparency.
@@ -195,12 +189,10 @@ The final **raw score** for a non-docs PR is the sum of all the above contributi
 After computing the raw score, it is mapped to a **difficulty level** and **event points** as follows:
 
 - **Level L3**
-
   - Condition: `score ≥ 50`
   - Event points: **10**
 
 - **Level L2**
-
   - Condition: `30 ≤ score < 50`
   - Event points: **7**
 
@@ -209,6 +201,65 @@ After computing the raw score, it is mapped to a **difficulty level** and **even
   - Event points: **3**
 
 There is currently **no separate "Level 0"** once a PR reaches the scoring stage; if it passes the event label + merged gates, it will receive at least **L1** with the corresponding points, even if heavily penalized (e.g., docs‑only PRs).
+
+---
+
+### 3. Finale Bonus Multiplier Window
+
+To reward active contributors near the end of the event, ECWoC Sentinel applies a **contributor‑points‑based multiplier** only within a fixed **finale bonus window**.
+
+**Bonus window (UTC):**
+
+- Start: **2026‑02‑22 12:00:00 UTC**
+- End: **2026‑02‑28 23:59:59 UTC**
+
+For PRs scored **inside** this window, the base event points (3 / 7 / 10) are multiplied by a tier derived from the contributor’s **lifetime total points**:
+
+- Tier 1: `0–500` points → **2.0x**
+- Tier 2: `501–1000` points → **1.75x**
+- Tier 3: `1001–2000` points → **1.5x**
+- Tier 4: `2001–4000` points → **1.25x**
+- Tier 5: `4000+` points → **1.1x**
+
+Outside this window, the effective multiplier is **1.0** (no bonus), so event points are exactly `3 / 7 / 10` depending on L1 / L2 / L3.
+
+PRs that receive the finale bonus are labeled accordingly on GitHub, for example:
+
+- `ECWoC26-L1-FINALE-BONUS`
+- `ECWoC26-L2-FINALE-BONUS`
+- `ECWoC26-L3-FINALE-BONUS`
+
+PRs scored outside the bonus window keep the existing labels:
+
+- `ECWoC26-L1`, `ECWoC26-L2`, `ECWoC26-L3`.
+
+Internally, each scored PR also stores a flag indicating whether the finale bonus was applied, making the effect **auditable**.
+
+---
+
+### 4. Event End Cutoff (No Scoring After Event)
+
+The ECWoC event has a hard **end cutoff**; PRs created after this moment are **recorded but never scored**.
+
+**Event end (UTC):**
+
+- Cutoff: **2026‑03‑01 00:00:00 UTC**
+
+Behavior for PRs **created on or after** this timestamp:
+
+- The PR is still fetched and stored in MongoDB for historical records.
+- It is marked with:
+  - `score: 0`
+  - `level: "ENDED"`
+  - `points: 0`
+  - reason: _"Event period has ended; PR not eligible for scoring"_
+- On GitHub, a label like **`ECWoC26-ENDED`** is applied (best‑effort) to clearly indicate that the PR is outside the event window.
+- No contributor totals are incremented; the contributor receives **no points** for such PRs.
+
+This ensures that:
+
+- **All PRs are tracked**, even those after the event.
+- **No one can game the system** by sending new PRs after the official end.
 
 ---
 

@@ -8,9 +8,11 @@ import { runScorer } from "../../services/scorer.services.js";
 import { addLabelToPullRequest } from "../../services/github.services.js";
 import PR from "../../models/PR.js";
 import Contributor from "../../models/Contributor.js";
+import { getContributorPoints } from "../../services/contributorPoints.js";
 import { BLOCKED_USERS, BLOCKED_PROJECTS } from "../../config/hardgates.js";
 
 const EVENT_LABEL = "ECWoC26";
+const EVENT_END = new Date("2026-03-01T00:00:00.000Z");
 
 const isHardBlockedPR = ({ pr, repoOwner, repoName }) => {
   const username = pr?.user?.login?.toLowerCase() || "";
@@ -66,6 +68,9 @@ const prWorker = new Worker(
         repo: repo_name,
         prNumber: pr_number,
       });
+      const createdAt = pr?.created_at ? new Date(pr.created_at) : null;
+      const contributor = pr.user.login;
+      const points = await getContributorPoints(contributor);
 
       const isMerged = pr.merged === true;
       const hasEventLabel = pr.labels?.some(
@@ -84,7 +89,76 @@ const prWorker = new Worker(
         return { skipped: true, reason: "Already scored" };
       }
 
-      // 3️⃣ Pending conditions (IMPORTANT CHANGE)
+      // 3️⃣ Event window end: PRs created after event end are not scored
+      if (createdAt && createdAt >= EVENT_END) {
+        const locChanged = (pr.additions || 0) + (pr.deletions || 0);
+
+        const result = {
+          score: 0,
+          level: "ENDED",
+          points: 0,
+          reasons: [
+            "Event period has ended; PR not eligible for scoring",
+          ],
+        };
+
+        const endedLabel = `${EVENT_LABEL}-ENDED`;
+        try {
+          await addLabelToPullRequest({
+            installationId: installation_id,
+            owner: repo_owner,
+            repo: repo_name,
+            prNumber: pr_number,
+            label: endedLabel,
+          });
+          console.log(`🏷️ Applied label ${endedLabel} for post-event PR`);
+        } catch (err) {
+          console.error("⚠️ Labeling (ENDED) failed:", err.message);
+        }
+
+        await PR.findOneAndUpdate(
+          {
+            repoOwner: repo_owner,
+            repoName: repo_name,
+            prNumber: pr_number,
+          },
+          {
+            repoOwner: repo_owner,
+            repoName: repo_name,
+            prNumber: pr_number,
+            contributor: pr.user.login,
+            prTitle: pr.title,
+            prUrl: pr.html_url,
+            mergedAt: pr.merged_at ? new Date(pr.merged_at) : undefined,
+            score: result.score,
+            level: result.level,
+            points: result.points,
+            reasons: result.reasons,
+            metrics: {
+              locChanged,
+              filesChanged: 0,
+              density: 0,
+              newFilesCount: 0,
+              hasTests: false,
+            },
+            scored: true,
+            pendingReason: "Event period ended",
+          },
+          { upsert: true, new: true }
+        );
+
+        console.log(
+          `⏹️ PR #${pr_number} marked as ENDED (created after event period)`
+        );
+
+        return {
+          prNumber: pr.number,
+          ...result,
+          eventEnded: true,
+        };
+      }
+
+      // 4️⃣ Pending conditions (IMPORTANT CHANGE)
       if (!isMerged || !hasEventLabel) {
         console.log(
           `⏳ PR #${pr_number} pending — merged: ${isMerged}, label: ${hasEventLabel}`
@@ -121,7 +195,7 @@ const prWorker = new Worker(
         };
       }
 
-      // 4️⃣ HARD GATE: Removed / disqualified projects & users
+      // 5️⃣ HARD GATE: Removed / disqualified projects & users
       const { blocked, reason: hardgateReason } = isHardBlockedPR({
         pr,
         repoOwner: repo_owner,
@@ -197,7 +271,7 @@ const prWorker = new Worker(
         };
       }
 
-      // 5️⃣ Fetch PR files
+      // 6️⃣ Fetch PR files
       const files = await fetchPullRequestFiles({
         installationId: installation_id,
         owner: repo_owner,
@@ -205,10 +279,10 @@ const prWorker = new Worker(
         prNumber: pr_number,
       });
 
-      // 6️⃣ Run scorer
-      const result = runScorer(pr, files);
+      // 7️⃣ Run scorer
+      const result = runScorer(pr, files, points);
 
-      // 7️⃣ Compute metrics
+      // 8️⃣ Compute metrics
       const locChanged = pr.additions + pr.deletions;
       const filesCount = files.length;
       const density = locChanged / Math.max(filesCount, 1);
@@ -221,8 +295,10 @@ const prWorker = new Worker(
           file.additions >= 10
       );
 
-      // 8️⃣ Apply level label (best-effort)
-      const levelLabel = `${EVENT_LABEL}-${result.level}`;
+      // 9️⃣ Apply level label (best-effort)
+      const levelLabel = result.bonusApplied
+        ? `${EVENT_LABEL}-${result.level}-BONUS`
+        : `${EVENT_LABEL}-${result.level}`;
       try {
         await addLabelToPullRequest({
           installationId: installation_id,
@@ -236,7 +312,7 @@ const prWorker = new Worker(
         console.error("⚠️ Labeling failed:", err.message);
       }
 
-      // 9️⃣ Persist final PR record
+      // 🔟 Persist final PR record
       await PR.findOneAndUpdate(
         {
           repoOwner: repo_owner,
@@ -268,7 +344,7 @@ const prWorker = new Worker(
         { upsert: true, new: true }
       );
 
-      // 🔟 Update contributor stats
+      // 1️⃣1️⃣ Update contributor stats
       await Contributor.findOneAndUpdate(
         { githubUsername: pr.user.login },
         {

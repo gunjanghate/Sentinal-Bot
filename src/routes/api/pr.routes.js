@@ -1,6 +1,5 @@
 import express from "express";
 import PR from "../../../models/PR.js";
-
 const router = express.Router();
 
 /**

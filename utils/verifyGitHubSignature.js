@@ -9,6 +9,16 @@ export const verifyGitHubSignature = (req) => {
     return false;
   }
 
+  if (!secret) {
+    console.error("⚠️ GITHUB_WEBHOOK_SECRET is not configured; rejecting webhook");
+    return false;
+  }
+
+  if (!req.rawBody) {
+    console.error("⚠️ req.rawBody is missing; cannot verify signature");
+    return false;
+  }
+
   // Create HMAC-SHA256 hash using webhook secret
   const hmac = crypto.createHmac("sha256", secret);
 

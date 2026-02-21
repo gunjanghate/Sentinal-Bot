@@ -6,14 +6,33 @@
  * Then apply complexity-based caps to prevent gaming.
  */
 
-export const runScorer = (pr, files) => {
+const BONUS_START = new Date("2026-02-22T12:00:00.000Z");
+const BONUS_END = new Date("2026-02-28T23:59:59.999Z");
+
+const isInBonusWindow = (now = new Date()) =>
+  now >= BONUS_START && now <= BONUS_END;
+
+export const runScorer = (pr, files, contributorPoints) => {
   let score = 0;
   const reasons = [];
 
+  const safeFiles = Array.isArray(files) ? files : [];
+
   // Only count added lines as "effort" to avoid rewarding large deletions
-  const locAdded = pr.additions;
-  const filesCount = files.length;
-  const density = locAdded / Math.max(filesCount, 1);
+  const locAdded =
+    pr && typeof pr.additions === "number" ? pr.additions : 0;
+  const filesCount = safeFiles.length;
+  const density = filesCount === 0 ? 0 : locAdded / filesCount;
+
+  // No files at all is treated as invalid input
+  if (filesCount === 0) {
+    return {
+      score: 0,
+      level: "INVALID",
+      points: 0,
+      reasons: ["No files found in PR; PR marked INVALID"],
+    };
+  }
 
   // -----------------------------
   // HARD GATE: No additions => INVALID
@@ -47,16 +66,16 @@ export const runScorer = (pr, files) => {
       filename.toLowerCase().endsWith(ext)
     );
 
-  const isDocsOnly = files.every((file) =>
-    file.filename.endsWith(".md")
+  const isDocsOnly = safeFiles.every((file) =>
+    (file?.filename || "").endsWith(".md")
   );
 
-  const isMarkupOnly = files.every((file) =>
-    isMarkupFile(file.filename)
+  const isMarkupOnly = safeFiles.every((file) =>
+    isMarkupFile(file?.filename || "")
   );
 
-  const hasAnyMarkup = files.some((file) =>
-    isMarkupFile(file.filename)
+  const hasAnyMarkup = safeFiles.some((file) =>
+    isMarkupFile(file?.filename || "")
   );
 
   // -----------------------------
@@ -110,7 +129,7 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   // 4️⃣ FEATURE SIGNAL: New files
   // -----------------------------
-  const newFilesCount = files.filter(
+  const newFilesCount = safeFiles.filter(
     (file) => file.status === "added"
   ).length;
 
@@ -122,7 +141,7 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   // 5️⃣ QUALITY SIGNAL: Tests
   // -----------------------------
-  const meaningfulTests = files.some(
+  const meaningfulTests = safeFiles.some(
     (file) =>
       /test|spec/i.test(file.filename) &&
       file.additions >= 10
@@ -143,7 +162,7 @@ export const runScorer = (pr, files) => {
       "Contains HTML/CSS alongside code; adjusted to reduce styling-dominated score"
     );
   }
-    if (isMarkupOnly) {
+  if (isMarkupOnly) {
     score -= 20;
     reasons.push(
       "HTML/CSS-only changes; adjusted to reduce styling-dominated score"
@@ -155,16 +174,29 @@ export const runScorer = (pr, files) => {
   // 7️⃣ FINAL LEVEL MAPPING
   // -----------------------------
   let level, points;
+  const bonusActive = isInBonusWindow();
+
+  // Tier 1: 0 – 500 points → 2.0x
+  // Tier 2: 501 – 1000 points → 1.75x
+  // Tier 3: 1001 – 2000 points → 1.5x
+  // Tier 4: 2001 – 4000 points → 1.25x
+  // Tier 5: 4000+ points → 1.1x
+  const baseMultiplier = contributorPoints >= 4000 ? 1.1 :
+    contributorPoints >= 2001 ? 1.25 :
+      contributorPoints >= 1001 ? 1.5 :
+        contributorPoints >= 501 ? 1.75 : 2.0;
+
+  const multiplier = bonusActive ? baseMultiplier : 1.0;
 
   if (score >= 50) {
     level = "L3";
-    points = 10;
+    points = 10 * multiplier;
   } else if (score >= 30) {
     level = "L2";
-    points = 7;
+    points = 7 * multiplier;
   } else {
     level = "L1";
-    points = 3;
+    points = 3 * multiplier;
   }
 
 
@@ -173,7 +205,7 @@ export const runScorer = (pr, files) => {
   // -----------------------------
   if (isMarkupOnly && level === "L3") {
     level = "L2";
-    points = 7;
+    points = 7 * multiplier;
     reasons.push(
       "HTML/CSS-only changes capped at L2 due to low system complexity"
     );
@@ -184,5 +216,6 @@ export const runScorer = (pr, files) => {
     level,
     points,
     reasons,
+    bonusApplied: bonusActive,
   };
 };
