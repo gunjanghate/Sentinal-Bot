@@ -297,7 +297,7 @@ const prWorker = new Worker(
 
       // 9️⃣ Apply level label (best-effort)
       const levelLabel = result.bonusApplied
-        ? `${EVENT_LABEL}-${result.level}-BONUS`
+        ? `${EVENT_LABEL}-SPRINT-${result.level}`
         : `${EVENT_LABEL}-${result.level}`;
       try {
         await addLabelToPullRequest({
