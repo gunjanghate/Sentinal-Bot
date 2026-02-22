@@ -280,7 +280,9 @@ const prWorker = new Worker(
       });
 
       // 7️⃣ Run scorer
+      console.log(`🔢 Scoring PR #${pr_number} with ${files.length} files changed and contributor points: ${points}`);
       const result = runScorer(pr, files, points);
+      console.log(`🎯 Scoring result for PR #${pr_number}:`, result);
 
       // 8️⃣ Compute metrics
       const locChanged = pr.additions + pr.deletions;

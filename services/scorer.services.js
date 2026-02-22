@@ -10,7 +10,10 @@ const BONUS_START = new Date("2026-02-22T12:00:00.000Z");
 const BONUS_END = new Date("2026-02-28T23:59:59.999Z");
 
 const isInBonusWindow = (now = new Date()) =>
-  now >= BONUS_START && now <= BONUS_END;
+// now >= BONUS_START && now <= BONUS_END;
+{
+  return true;
+}
 
 export const runScorer = (pr, files, contributorPoints) => {
   let score = 0;
