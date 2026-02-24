@@ -382,6 +382,12 @@ const prWorker = new Worker(
   {
     connection: bullRedis,
     concurrency: 5,
+    removeOnComplete: {
+      count: 100,  // keep only last 100 completed jobs
+    },
+    removeOnFail: {
+      count: 100,  // keep last 100 failed jobs
+    },
   }
 );
 
