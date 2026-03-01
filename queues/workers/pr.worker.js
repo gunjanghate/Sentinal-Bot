@@ -12,7 +12,7 @@ import { getContributorPoints } from "../../services/contributorPoints.js";
 import { BLOCKED_USERS, BLOCKED_PROJECTS } from "../../config/hardgates.js";
 
 const EVENT_LABEL = "ECWoC26";
-const EVENT_END = new Date("2026-03-01T00:00:00.000Z");
+const EVENT_END = new Date("2026-03-08T00:00:00.000Z");
 
 const isHardBlockedPR = ({ pr, repoOwner, repoName }) => {
   const username = pr?.user?.login?.toLowerCase() || "";
