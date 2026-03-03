@@ -9,10 +9,13 @@ import { addLabelToPullRequest } from "../../services/github.services.js";
 import PR from "../../models/PR.js";
 import Contributor from "../../models/Contributor.js";
 import { getContributorPoints } from "../../services/contributorPoints.js";
-import { BLOCKED_USERS, BLOCKED_PROJECTS } from "../../config/hardgates.js";
+import { BLOCKED_USERS, BLOCKED_PROJECTS, SpecialProjects } from "../../config/hardgates.js";
 
 const EVENT_LABEL = "ECWoC26";
 const EVENT_END = new Date("2026-03-08T00:00:00.000Z");
+
+const SPECIAL_FEATURE_LABEL = "feature-forge";
+const SPECIAL_BUG_LABEL = "bug-bounty";
 
 const isHardBlockedPR = ({ pr, repoOwner, repoName }) => {
   const username = pr?.user?.login?.toLowerCase() || "";
@@ -46,6 +49,62 @@ const isHardBlockedPR = ({ pr, repoOwner, repoName }) => {
   }
 
   return { blocked: false };
+};
+
+const getSpecialProjectCategory = ({ pr, repoOwner, repoName }) => {
+  const repoSlug = `${repoOwner}/${repoName}`.toLowerCase();
+  const repoUrl =
+    pr?.base?.repo?.html_url?.toLowerCase() ||
+    pr?.head?.repo?.html_url?.toLowerCase() ||
+    "";
+
+  const specialProjects = (SpecialProjects || []).map((p) => p.toLowerCase());
+
+  const isSpecialProject = specialProjects.some((entry) => {
+    if (!entry) return false;
+    const normalized = entry.replace(/^https?:\/\/github\.com\//, "").toLowerCase();
+    return (
+      repoSlug === normalized ||
+      repoUrl.endsWith(`/${normalized}`) ||
+      repoUrl === `https://github.com/${normalized}`
+    );
+  });
+
+  if (!isSpecialProject) {
+    return { isSpecial: false };
+  }
+
+  const labelNames = Array.isArray(pr.labels)
+    ? pr.labels
+      .map((l) => (typeof l?.name === "string" ? l.name.toLowerCase() : ""))
+      .filter(Boolean)
+    : [];
+
+  const hasFeatureForge = labelNames.includes(SPECIAL_FEATURE_LABEL);
+  const hasBugBounty = labelNames.includes(SPECIAL_BUG_LABEL);
+
+  if (!hasFeatureForge && !hasBugBounty) {
+    return { isSpecial: false };
+  }
+
+  // If both are present, treat as bug-bounty (higher tier)
+  if (hasBugBounty) {
+    return {
+      isSpecial: true,
+      category: "bug-fix",
+      fixedPoints: 100,
+    };
+  }
+
+  if (hasFeatureForge) {
+    return {
+      isSpecial: true,
+      category: "feat-added",
+      fixedPoints: 50,
+    };
+  }
+
+  return { isSpecial: false };
 };
 
 const prWorker = new Worker(
@@ -281,7 +340,28 @@ const prWorker = new Worker(
 
       // 7️⃣ Run scorer
       console.log(`🔢 Scoring PR #${pr_number} with ${files.length} files changed and contributor points: ${points}`);
-      const result = runScorer(pr, files, points);
+      let result = runScorer(pr, files, points);
+
+      // 7️⃣a Special projects: override level/points and label when applicable
+      const specialContext = getSpecialProjectCategory({
+        pr,
+        repoOwner: repo_owner,
+        repoName: repo_name,
+      });
+
+      if (specialContext.isSpecial) {
+        result = {
+          ...result,
+          level: specialContext.category,
+          points: specialContext.fixedPoints,
+          bonusApplied: false,
+          reasons: [
+            ...(Array.isArray(result.reasons) ? result.reasons : []),
+            `Special project (${specialContext.category}) with fixed points (${specialContext.fixedPoints}) and no multiplier`,
+          ],
+        };
+      }
+
       console.log(`🎯 Scoring result for PR #${pr_number}:`, result);
 
       // 8️⃣ Compute metrics
@@ -297,10 +377,12 @@ const prWorker = new Worker(
           file.additions >= 10
       );
 
-      // 9️⃣ Apply level label (best-effort)
-      const levelLabel = result.bonusApplied
-        ? `${EVENT_LABEL}-SPRINT-${result.level}`
-        : `${EVENT_LABEL}-${result.level}`;
+      // 9️⃣ Apply label (best-effort)
+      const levelLabel = specialContext.isSpecial
+        ? `${EVENT_LABEL}-${specialContext.category}`
+        : result.bonusApplied
+          ? `${EVENT_LABEL}-SPRINT-${result.level}`
+          : `${EVENT_LABEL}-${result.level}`;
       try {
         await addLabelToPullRequest({
           installationId: installation_id,

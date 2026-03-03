@@ -25,3 +25,9 @@ export const BLOCKED_PROJECTS = [
     "https://github.com/SUGAM-ARORA/Toolva"
 
 ];
+
+export const SpecialProjects = [
+    "https://github.com/gunjanghate/GitGenie",
+    "https://github.com/AMANkumar0004/wanderLust",
+    "https://github.com/kaifansariw/GameHub"
+]
