@@ -12,7 +12,7 @@ import { getContributorPoints } from "../../services/contributorPoints.js";
 import { BLOCKED_USERS, BLOCKED_PROJECTS, SpecialProjects } from "../../config/hardgates.js";
 
 const EVENT_LABEL = "ECWoC26";
-const EVENT_END = new Date("2026-03-08T00:00:00.000Z");
+const EVENT_END = new Date("2026-03-07T00:00:00.000Z");
 
 const SPECIAL_FEATURE_LABEL = "feature-forge";
 const SPECIAL_BUG_LABEL = "bug-bounty";
