@@ -191,15 +191,25 @@ export const runScorer = (pr, files, contributorPoints) => {
 
   const multiplier = bonusActive ? baseMultiplier : 1.0;
 
+  // if (score >= 50) {
+  //   level = "L3";
+  //   points = 10 * multiplier;
+  // } else if (score >= 30) {
+  //   level = "L2";
+  //   points = 7 * multiplier;
+  // } else {
+  //   level = "L1";
+  //   points = 3 * multiplier;
+  // }
   if (score >= 50) {
     level = "L3";
-    points = 10 * multiplier;
+    points = 50 ;
   } else if (score >= 30) {
     level = "L2";
-    points = 7 * multiplier;
+    points = 100 ;
   } else {
     level = "L1";
-    points = 3 * multiplier;
+    points = 150 ;
   }
 
 
@@ -208,7 +218,7 @@ export const runScorer = (pr, files, contributorPoints) => {
   // -----------------------------
   if (isMarkupOnly && level === "L3") {
     level = "L2";
-    points = 7 * multiplier;
+    points = 100 ;
     reasons.push(
       "HTML/CSS-only changes capped at L2 due to low system complexity"
     );

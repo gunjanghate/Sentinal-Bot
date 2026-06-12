@@ -5,9 +5,8 @@ dotenv.config();
 const isProd = process.env.NODE_ENV === "production";
 
 const redis = new Redis(process.env.REDIS_URL, {
-  maxRetriesPerRequest: null,
+  maxRetriesPerRequest: null, 
   enableReadyCheck: true,
-
 });
 redis.on("connect", () => {
   console.log("🔗 Redis Connected Successfully");

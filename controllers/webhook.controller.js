@@ -1,7 +1,7 @@
 import { verifyGitHubSignature } from "../utils/verifyGitHubSignature.js";
 import { prQueue } from "../queues/prQueue.js";
 
-const EVENT_LABEL = "ECWoC26";
+const EVENT_LABEL = "ECSoC26";
 
 export const handleGitHubWebhook = async (req, res) => {
   try {

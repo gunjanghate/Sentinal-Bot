@@ -11,11 +11,11 @@ import Contributor from "../../models/Contributor.js";
 import { getContributorPoints } from "../../services/contributorPoints.js";
 import { BLOCKED_USERS, BLOCKED_PROJECTS, SpecialProjects } from "../../config/hardgates.js";
 
-const EVENT_LABEL = "ECWoC26";
-const EVENT_END = new Date("2026-03-07T00:00:00.000Z");
+const EVENT_LABEL = "ECSoC26";
+// const EVENT_END = new Date("2026-03-07T00:00:00.000Z");
 
-const SPECIAL_FEATURE_LABEL = "feature-forge";
-const SPECIAL_BUG_LABEL = "bug-bounty";
+// const SPECIAL_FEATURE_LABEL = "feature-forge";
+// const SPECIAL_BUG_LABEL = "bug-bounty";
 
 const isHardBlockedPR = ({ pr, repoOwner, repoName }) => {
   const username = pr?.user?.login?.toLowerCase() || "";
@@ -149,73 +149,73 @@ const prWorker = new Worker(
       }
 
       // 3️⃣ Event window end: PRs created after event end are not scored
-      if (createdAt && createdAt >= EVENT_END) {
-        const locChanged = (pr.additions || 0) + (pr.deletions || 0);
+      //  if (createdAt && createdAt >= EVENT_END) {
+      // const locChanged = (pr.additions || 0) + (pr.deletions || 0);
 
-        const result = {
-          score: 0,
-          level: "ENDED",
-          points: 0,
-          reasons: [
-            "Event period has ended; PR not eligible for scoring",
-          ],
-        };
+      //   const result = {
+      //     score: 0,
+      //     level: "ENDED",
+      //     points: 0,
+      //     reasons: [
+      //       "Event period has ended; PR not eligible for scoring",
+      //     ],
+      //   };
 
-        const endedLabel = `${EVENT_LABEL}-ENDED`;
-        try {
-          await addLabelToPullRequest({
-            installationId: installation_id,
-            owner: repo_owner,
-            repo: repo_name,
-            prNumber: pr_number,
-            label: endedLabel,
-          });
-          console.log(`🏷️ Applied label ${endedLabel} for post-event PR`);
-        } catch (err) {
-          console.error("⚠️ Labeling (ENDED) failed:", err.message);
-        }
+      //   const endedLabel = `${EVENT_LABEL}-ENDED`;
+      //   try {
+      //     await addLabelToPullRequest({
+      //       installationId: installation_id,
+      //       owner: repo_owner,
+      //       repo: repo_name,
+      //       prNumber: pr_number,
+      //       label: endedLabel,
+      //     });
+      //     console.log(`🏷️ Applied label ${endedLabel} for post-event PR`);
+      //   } catch (err) {
+      //     console.error("⚠️ Labeling (ENDED) failed:", err.message);
+      //   }
 
-        await PR.findOneAndUpdate(
-          {
-            repoOwner: repo_owner,
-            repoName: repo_name,
-            prNumber: pr_number,
-          },
-          {
-            repoOwner: repo_owner,
-            repoName: repo_name,
-            prNumber: pr_number,
-            contributor: pr.user.login,
-            prTitle: pr.title,
-            prUrl: pr.html_url,
-            mergedAt: pr.merged_at ? new Date(pr.merged_at) : undefined,
-            score: result.score,
-            level: result.level,
-            points: result.points,
-            reasons: result.reasons,
-            metrics: {
-              locChanged,
-              filesChanged: 0,
-              density: 0,
-              newFilesCount: 0,
-              hasTests: false,
-            },
-            scored: true,
-            pendingReason: "Event period ended",
-          },
-          { upsert: true, new: true }
-        );
+      //   await PR.findOneAndUpdate(
+      //     {
+      //       repoOwner: repo_owner,
+      //       repoName: repo_name,
+      //       prNumber: pr_number,
+      //     },
+      //     {
+      //       repoOwner: repo_owner,
+      //       repoName: repo_name,
+      //       prNumber: pr_number,
+      //       contributor: pr.user.login,
+      //       prTitle: pr.title,
+      //       prUrl: pr.html_url,
+      //       mergedAt: pr.merged_at ? new Date(pr.merged_at) : undefined,
+      //       score: result.score,
+      //       level: result.level,
+      //       points: result.points,
+      //       reasons: result.reasons,
+      //       metrics: {
+      //         locChanged,
+      //         filesChanged: 0,
+      //         density: 0,
+      //         newFilesCount: 0,
+      //         hasTests: false,
+      //       },
+      //       scored: true,
+      //       pendingReason: "Event period ended",
+      //     },
+      //     { upsert: true, new: true }
+      //   );
 
-        console.log(
-          `⏹️ PR #${pr_number} marked as ENDED (created after event period)`
-        );
+      //   console.log(
+      //     `⏹️ PR #${pr_number} marked as ENDED (created after event period)`
+      //   );
 
-        return {
-          prNumber: pr.number,
-          ...result,
-          eventEnded: true,
-        };
-      }
+      //   return {
+      //     prNumber: pr.number,
+      //     ...result,
+      //     eventEnded: true,
+      //   };
+      // }
 
       // 4️⃣ Pending conditions (IMPORTANT CHANGE)
       if (!isMerged || !hasEventLabel) {
@@ -463,7 +463,7 @@ const prWorker = new Worker(
   },
   {
     connection: bullRedis,
-    concurrency: 5,
+    concurrency: 10,
     removeOnComplete: {
       count: 100,  // keep only last 100 completed jobs
     },
